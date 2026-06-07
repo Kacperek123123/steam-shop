@@ -1,75 +1,74 @@
 import { useEffect, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
 
+const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+
 export default function Home() {
   const [user, setUser] = useState(null);
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-    );
-
     const fetchData = async () => {
-      // 1. Pobierz sesję użytkownika
       const { data: { session } } = await supabase.auth.getSession();
       if (session) setUser(session.user);
 
-      // 2. Pobierz WSZYSTKIE produkty bez filtrów
-      const { data, error } = await supabase.from('steam_accounts').select('*');
-      
-      if (error) {
-        console.error("BŁĄD POBIERANIA Z BAZY:", error);
-      } else {
-        console.log("Pobrano konta:", data);
-        setProducts(data || []);
-      }
+      const { data } = await supabase.from('steam_accounts').select('*').eq('status', 'available');
+      setProducts(data || []);
       setLoading(false);
     };
-
     fetchData();
   }, []);
 
-  const login = async () => {
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-    );
-    await supabase.auth.signInWithOAuth({ provider: 'discord' });
+  const login = async () => await supabase.auth.signInWithOAuth({ provider: 'discord' });
+
+  const startPurchase = async (product, method) => {
+    const { data, error } = await supabase.from('orders').insert([{
+      discord_id: user.id,
+      product_id: product.id,
+      payment_method: method,
+      status: 'pending',
+      amount: product.price
+    }]).select().single();
+
+    if (error) return alert("Błąd startu płatności");
+    
+    if (method === 'crypto') {
+      alert(`Wpłać ${product.price} LTC na adres: LM3eUhktfk69fRLXncjrRA4qEyULJmbbPc\nID zamówienia (wpisz w tytule): ${data.id}`);
+    } else if (method === 'psc') {
+      const code = prompt("Wklej kod PSC:");
+      if (code) {
+        await supabase.from('orders').update({ psc_code: code, status: 'waiting_for_admin' }).eq('id', data.id);
+        alert("Kod wysłany do sprawdzenia!");
+      }
+    }
   };
 
   return (
     <div style={styles.container}>
       <header style={styles.header}>
         <h1 style={styles.logo}>ARCYN<span style={{color: '#5865F2'}}> MARKET</span></h1>
-        {user ? <div style={styles.userBadge}>{user.user_metadata?.full_name}</div> : null}
+        {user ? <button onClick={() => window.location.href='/panel'} style={styles.userBadge}>Moje Zakupy</button> : null}
       </header>
 
       <main style={styles.main}>
-        {loading ? <p>Ładowanie zasobów...</p> : !user ? (
+        {loading ? <p>Ładowanie...</p> : !user ? (
           <div style={styles.hero}>
             <h2>Witaj w ARCYN</h2>
-            <p>Najlepsze konta współdzielone w zasięgu ręki.</p>
             <button onClick={login} style={styles.loginBtn}>Zaloguj przez Discord</button>
           </div>
         ) : (
           <div style={styles.grid}>
-            {products.length > 0 ? products.map((p) => (
+            {products.map((p) => (
               <div key={p.id} style={styles.card}>
-                <h3 style={styles.title}>{p.login}</h3>
-                <p style={styles.desc}>{p.description || "Konto współdzielone"}</p>
-                
-                <div style={styles.dataBox}>
-                  <p><strong>Login:</strong> {p.login}</p>
-                  <p><strong>Hasło:</strong> {p.password}</p>
-                  <p style={{color: '#5865F2'}}><strong>Kod Guard:</strong> {p.guard_code}</p>
+                <h3>{p.login}</h3>
+                <p>Cena: {p.price} LTC</p>
+                <div style={{display: 'flex', gap: '5px', marginTop: '10px'}}>
+                  <button onClick={() => startPurchase(p, 'crypto')} style={styles.btn}>Kup (Krypto)</button>
+                  <button onClick={() => startPurchase(p, 'psc')} style={styles.btn}>Kup (PSC)</button>
                 </div>
-                
-                <button style={styles.btn}>Pobierz dane</button>
               </div>
-            )) : <p>Brak dostępnych kont w bazie.</p>}
+            ))}
           </div>
         )}
       </main>
@@ -78,17 +77,14 @@ export default function Home() {
 }
 
 const styles = {
-  container: { backgroundColor: '#0b0e14', minHeight: '100vh', color: '#fff', padding: '20px', fontFamily: 'system-ui, sans-serif' },
-  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px 0', borderBottom: '1px solid #222' },
-  logo: { fontSize: '28px', fontWeight: '800', margin: 0 },
-  userBadge: { background: '#222', padding: '8px 16px', borderRadius: '20px', fontSize: '14px' },
+  container: { backgroundColor: '#0b0e14', minHeight: '100vh', color: '#fff', padding: '20px', fontFamily: 'system-ui' },
+  header: { display: 'flex', justifyContent: 'space-between', padding: '20px 0' },
+  logo: { fontSize: '28px', fontWeight: '800' },
+  userBadge: { background: '#5865F2', border: 'none', color: '#fff', padding: '8px 16px', borderRadius: '20px', cursor: 'pointer' },
   main: { maxWidth: '1000px', margin: '40px auto' },
   hero: { textAlign: 'center', padding: '60px', background: '#151921', borderRadius: '20px' },
-  loginBtn: { background: '#5865F2', border: 'none', color: '#fff', padding: '15px 30px', borderRadius: '10px', fontSize: '16px', cursor: 'pointer', marginTop: '20px' },
+  loginBtn: { background: '#5865F2', border: 'none', color: '#fff', padding: '15px 30px', borderRadius: '10px', cursor: 'pointer' },
   grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px' },
-  card: { background: '#151921', padding: '25px', borderRadius: '16px', border: '1px solid #222', transition: '0.3s' },
-  title: { fontSize: '20px', margin: '0 0 10px 0' },
-  desc: { fontSize: '13px', color: '#888', marginBottom: '15px' },
-  dataBox: { background: '#0b0e14', padding: '15px', borderRadius: '10px', marginBottom: '15px', fontSize: '14px', border: '1px solid #222' },
-  btn: { width: '100%', padding: '12px', background: '#1a1f29', border: '1px solid #333', color: '#fff', borderRadius: '8px', cursor: 'pointer' }
+  card: { background: '#151921', padding: '25px', borderRadius: '16px', border: '1px solid #222' },
+  btn: { flex: 1, padding: '10px', background: '#1a1f29', border: '1px solid #333', color: '#fff', borderRadius: '8px', cursor: 'pointer' }
 };
