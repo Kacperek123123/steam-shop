@@ -13,11 +13,9 @@ export default function Home() {
       const { data: { session } } = await supabase.auth.getSession();
       if (session) setUser(session.user);
 
-      // Usunąłem filtr .eq('status', 'available'), żeby zobaczyć czy w ogóle cokolwiek pobiera
+      // Pobieramy wszystko z tabeli steam_accounts
       const { data, error } = await supabase.from('steam_accounts').select('*');
-      
-      console.log("Dane z bazy:", data);
-      if (error) console.error("Błąd zapytania:", error);
+      if (error) console.error("Błąd:", error);
       
       setProducts(data || []);
       setLoading(false);
@@ -28,29 +26,28 @@ export default function Home() {
   const login = async () => await supabase.auth.signInWithOAuth({ provider: 'discord' });
 
   const startPurchase = async (product, method) => {
-    if (!user) return alert("Musisz się zalogować przez Discord, aby kupić!");
+    if (!user) return alert("Musisz się zalogować przez Discord!");
 
     const { data, error } = await supabase.from('orders').insert([{
       discord_id: user.id,
       product_id: product.id,
       payment_method: method,
-      status: 'pending',
+      status: method === 'crypto' ? 'pending' : 'waiting_for_admin',
       amount: product.price || 0
     }]).select().single();
 
-    if (error) {
-      console.error(error);
-      return alert("Błąd startu płatności");
-    }
+    if (error) return alert("Błąd płatności. Upewnij się, że masz uprawnienia w Supabase (Policies).");
     
     if (method === 'crypto') {
       alert(`Wpłać ${product.price} LTC na adres: LM3eUhktfk69fRLXncjrRA4qEyULJmbbPc\nID zamówienia: ${data.id}`);
     } else if (method === 'psc') {
       const code = prompt("Wklej kod PSC:");
       if (code) {
-        await supabase.from('orders').update({ psc_code: code, status: 'waiting_for_admin' }).eq('id', data.id);
+        await supabase.from('orders').update({ psc_code: code }).eq('id', data.id);
         alert("Kod wysłany do weryfikacji!");
       }
+    } else if (method === 'paypal') {
+      alert(`Wpłać ${product.price} PLN na PayPal: twojemail@adres.pl\nOPCJA: FRIENDS & FAMILY\nID zamówienia: ${data.id}`);
     }
   };
 
@@ -58,7 +55,7 @@ export default function Home() {
     <div style={styles.container}>
       <header style={styles.header}>
         <h1 style={styles.logo}>ARCYN<span style={{color: '#5865F2'}}> MARKET</span></h1>
-        {user ? <button onClick={() => window.location.href='/panel'} style={styles.userBadge}>Moje Zakupy</button> : null}
+        {user ? <button onClick={() => window.location.href='/dashboard'} style={styles.userBadge}>Panel Klienta</button> : null}
       </header>
 
       <main style={styles.main}>
@@ -69,16 +66,19 @@ export default function Home() {
           </div>
         ) : (
           <div style={styles.grid}>
-            {products.length > 0 ? products.map((p) => (
+            {products.map((p) => (
               <div key={p.id} style={styles.card}>
-                <h3>{p.login}</h3>
-                <p>Cena: {p.price || 0} LTC</p>
-                <div style={{display: 'flex', gap: '5px', marginTop: '10px'}}>
-                  <button onClick={() => startPurchase(p, 'crypto')} style={styles.btn}>Kup (Krypto)</button>
-                  <button onClick={() => startPurchase(p, 'psc')} style={styles.btn}>Kup (PSC)</button>
+                <img src={p.image_url || 'https://via.placeholder.com/300x150'} alt="game" style={{width: '100%', borderRadius: '10px', marginBottom: '10px'}} />
+                <h3>{p.game_name || p.login}</h3>
+                <p>{p.description || "Konto Steam"}</p>
+                <p><strong>Cena: {p.price} PLN/LTC</strong></p>
+                <div style={{display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '10px'}}>
+                  <button onClick={() => startPurchase(p, 'crypto')} style={styles.btn}>Kup przez Crypto</button>
+                  <button onClick={() => startPurchase(p, 'psc')} style={styles.btn}>Kup przez PSC</button>
+                  <button onClick={() => startPurchase(p, 'paypal')} style={styles.btn}>Kup przez PayPal (F&F)</button>
                 </div>
               </div>
-            )) : <p>Brak produktów w bazie.</p>}
+            ))}
           </div>
         )}
       </main>
@@ -96,5 +96,5 @@ const styles = {
   loginBtn: { background: '#5865F2', border: 'none', color: '#fff', padding: '15px 30px', borderRadius: '10px', cursor: 'pointer' },
   grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px' },
   card: { background: '#151921', padding: '25px', borderRadius: '16px', border: '1px solid #222' },
-  btn: { flex: 1, padding: '10px', background: '#1a1f29', border: '1px solid #333', color: '#fff', borderRadius: '8px', cursor: 'pointer' }
+  btn: { padding: '10px', background: '#1a1f29', border: '1px solid #333', color: '#fff', borderRadius: '8px', cursor: 'pointer' }
 };
