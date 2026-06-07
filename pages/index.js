@@ -1,24 +1,29 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { createClient } from '@supabase/supabase-js';
+
+const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
 
 export default function Home() {
-  // Lista produktów - możesz to potem pobierać z bazy, 
-  // ale na razie wpiszmy je tutaj ręcznie, żeby działało:
-  const products = [
-    { id: 1, name: "Konto Steam CS2", price: "50 PLN" },
-    { id: 2, name: "Konto Steam RUST", price: "70 PLN" }
-  ];
+  const [products, setProducts] = useState([]);
+  
+  useEffect(() => {
+    async function loadProducts() {
+      const { data } = await supabase.from('steam_accounts').select('*');
+      setProducts(data || []);
+    }
+    loadProducts();
+  }, []);
 
   return (
-    <div style={{ backgroundColor: '#0b0e14', color: '#fff', padding: '40px', fontFamily: 'sans-serif' }}>
+    <div style={{ background: '#0b0e14', color: '#fff', padding: '50px', fontFamily: 'system-ui' }}>
       <h1>ARCYN MARKET</h1>
-      <div style={{ display: 'grid', gap: '20px', marginTop: '20px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '20px' }}>
         {products.map(p => (
-          <div key={p.id} style={{ padding: '20px', border: '1px solid #333', borderRadius: '10px' }}>
-            <h3>{p.name}</h3>
-            <p>Cena: {p.price}</p>
-            <a href="https://discord.gg/TWÓJ_LINK_ZAPROSZENIA" target="_blank" 
-               style={{ background: '#5865F2', padding: '10px 20px', textDecoration: 'none', color: '#fff', borderRadius: '5px' }}>
-               KUP NA DISCORDZIE
+          <div key={p.id} style={{ border: '1px solid #333', padding: '20px', borderRadius: '15px' }}>
+            <h3>{p.game_name}</h3>
+            <p>Cena: {p.price} PLN</p>
+            <a href="https://discord.gg/eBfXSsRks" target="_blank" style={{ background: '#5865F2', padding: '10px', display: 'block', textAlign: 'center', borderRadius: '8px', color: '#fff', textDecoration: 'none' }}>
+              KUP TERAZ
             </a>
           </div>
         ))}
