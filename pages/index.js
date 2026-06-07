@@ -12,16 +12,24 @@ export default function Home() {
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
     );
 
-    supabase.auth.getSession().then(({ data }) => {
-      if (data.session) setUser(data.session.user);
+    const fetchData = async () => {
+      // 1. Pobierz sesję użytkownika
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) setUser(session.user);
+
+      // 2. Pobierz WSZYSTKIE produkty bez filtrów
+      const { data, error } = await supabase.from('steam_accounts').select('*');
       
-      // Pobieramy dane z tabeli
-      supabase.from('steam_accounts').select('*').eq('status', 'available')
-        .then(({ data: prodData }) => {
-          if (prodData) setProducts(prodData);
-          setLoading(false);
-        });
-    });
+      if (error) {
+        console.error("BŁĄD POBIERANIA Z BAZY:", error);
+      } else {
+        console.log("Pobrano konta:", data);
+        setProducts(data || []);
+      }
+      setLoading(false);
+    };
+
+    fetchData();
   }, []);
 
   const login = async () => {
@@ -48,7 +56,7 @@ export default function Home() {
           </div>
         ) : (
           <div style={styles.grid}>
-            {products.map((p) => (
+            {products.length > 0 ? products.map((p) => (
               <div key={p.id} style={styles.card}>
                 <h3 style={styles.title}>{p.login}</h3>
                 <p style={styles.desc}>{p.description || "Konto współdzielone"}</p>
@@ -61,7 +69,7 @@ export default function Home() {
                 
                 <button style={styles.btn}>Pobierz dane</button>
               </div>
-            ))}
+            )) : <p>Brak dostępnych kont w bazie.</p>}
           </div>
         )}
       </main>
