@@ -13,9 +13,8 @@ export default function Home() {
       const { data: { session } } = await supabase.auth.getSession();
       if (session) setUser(session.user);
 
-      // Pobieramy wszystko z tabeli steam_accounts
       const { data, error } = await supabase.from('steam_accounts').select('*');
-      if (error) console.error("Błąd:", error);
+      if (error) console.error("Błąd pobierania produktów:", error);
       
       setProducts(data || []);
       setLoading(false);
@@ -23,7 +22,14 @@ export default function Home() {
     fetchData();
   }, []);
 
-  const login = async () => await supabase.auth.signInWithOAuth({ provider: 'discord' });
+  const login = async () => {
+    await supabase.auth.signInWithOAuth({ 
+      provider: 'discord',
+      options: {
+        redirectTo: 'https://steam-shop-hsur.vercel.app/'
+      }
+    });
+  };
 
   const startPurchase = async (product, method) => {
     if (!user) return alert("Musisz się zalogować przez Discord!");
@@ -36,7 +42,10 @@ export default function Home() {
       amount: product.price || 0
     }]).select().single();
 
-    if (error) return alert("Błąd płatności. Upewnij się, że masz uprawnienia w Supabase (Policies).");
+    if (error) {
+      console.error("Szczegóły błędu:", error);
+      return alert("Błąd płatności: " + error.message);
+    }
     
     if (method === 'crypto') {
       alert(`Wpłać ${product.price} LTC na adres: LM3eUhktfk69fRLXncjrRA4qEyULJmbbPc\nID zamówienia: ${data.id}`);
