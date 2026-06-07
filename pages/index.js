@@ -23,6 +23,9 @@ export default function Home() {
   const login = async () => await supabase.auth.signInWithOAuth({ provider: 'discord' });
 
   const startPurchase = async (product, method) => {
+    // Dodane sprawdzenie zalogowania
+    if (!user) return alert("Musisz się zalogować przez Discord, aby kupić!");
+
     const { data, error } = await supabase.from('orders').insert([{
       discord_id: user.id,
       product_id: product.id,
@@ -34,12 +37,12 @@ export default function Home() {
     if (error) return alert("Błąd startu płatności");
     
     if (method === 'crypto') {
-      alert(`Wpłać ${product.price} LTC na adres: LM3eUhktfk69fRLXncjrRA4qEyULJmbbPc\nID zamówienia (wpisz w tytule): ${data.id}`);
+      alert(`Wpłać ${product.price} LTC na adres: LM3eUhktfk69fRLXncjrRA4qEyULJmbbPc\nID zamówienia: ${data.id}`);
     } else if (method === 'psc') {
       const code = prompt("Wklej kod PSC:");
       if (code) {
         await supabase.from('orders').update({ psc_code: code, status: 'waiting_for_admin' }).eq('id', data.id);
-        alert("Kod wysłany do sprawdzenia!");
+        alert("Kod wysłany do weryfikacji!");
       }
     }
   };
