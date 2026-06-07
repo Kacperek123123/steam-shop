@@ -13,9 +13,7 @@ export default function Home() {
       const { data: { session } } = await supabase.auth.getSession();
       if (session) setUser(session.user);
 
-      const { data, error } = await supabase.from('steam_accounts').select('*');
-      if (error) console.error("Błąd:", error);
-      
+      const { data } = await supabase.from('steam_accounts').select('*');
       setProducts(data || []);
       setLoading(false);
     };
@@ -29,34 +27,27 @@ export default function Home() {
     });
   };
 
-  // Uproszczona funkcja - przekierowuje na Discord
-  const startPurchase = (product) => {
-    window.open('https://discord.gg/TWÓJ_LINK_ZAPROSZENIA', '_blank');
-  };
-
   return (
     <div style={styles.container}>
       <header style={styles.header}>
         <h1 style={styles.logo}>ARCYN<span style={{color: '#5865F2'}}> MARKET</span></h1>
-        {user ? <button onClick={() => window.location.href='/dashboard'} style={styles.userBadge}>Moje Zamówienia</button> : null}
+        {user && <button onClick={() => window.location.href='/dashboard'} style={styles.userBadge}>Moje Konta</button>}
       </header>
 
       <main style={styles.main}>
         {loading ? <p>Ładowanie...</p> : !user ? (
           <div style={styles.hero}>
             <h2>Witaj w ARCYN</h2>
-            <p>Zaloguj się przez Discord, aby przeglądać ofertę.</p>
             <button onClick={login} style={styles.loginBtn}>Zaloguj przez Discord</button>
           </div>
         ) : (
           <div style={styles.grid}>
             {products.map((p) => (
               <div key={p.id} style={styles.card}>
-                <img src={p.image_url || 'https://via.placeholder.com/300x150'} alt="game" style={{width: '100%', borderRadius: '10px', marginBottom: '10px'}} />
-                <h3>{p.game_name || p.login}</h3>
-                <p>{p.description || "Konto Steam"}</p>
-                <p><strong>Cena: {p.price} PLN</strong></p>
-                <button onClick={() => startPurchase(p)} style={styles.btn}>KUP NA DISCORDZIE</button>
+                <img src={p.image_url} style={{width: '100%', borderRadius: '10px'}} />
+                <h3>{p.game_name}</h3>
+                <p>Cena: {p.price} PLN</p>
+                <a href="https://discord.gg/TWÓJ_LINK" target="_blank" style={styles.btn}>KUP TERAZ (Discord)</a>
               </div>
             ))}
           </div>
@@ -75,6 +66,6 @@ const styles = {
   hero: { textAlign: 'center', padding: '60px', background: '#151921', borderRadius: '20px' },
   loginBtn: { background: '#5865F2', border: 'none', color: '#fff', padding: '15px 30px', borderRadius: '10px', cursor: 'pointer' },
   grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px' },
-  card: { background: '#151921', padding: '25px', borderRadius: '16px', border: '1px solid #222', textAlign: 'center' },
-  btn: { width: '100%', padding: '12px', background: '#5865F2', border: 'none', color: '#fff', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }
+  card: { background: '#151921', padding: '20px', borderRadius: '16px', border: '1px solid #333', textAlign: 'center' },
+  btn: { display: 'block', padding: '12px', background: '#5865F2', color: '#fff', textDecoration: 'none', borderRadius: '8px', marginTop: '10px' }
 };
