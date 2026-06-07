@@ -13,7 +13,12 @@ export default function Home() {
       const { data: { session } } = await supabase.auth.getSession();
       if (session) setUser(session.user);
 
-      const { data } = await supabase.from('steam_accounts').select('*').eq('status', 'available');
+      // Usunąłem filtr .eq('status', 'available'), żeby zobaczyć czy w ogóle cokolwiek pobiera
+      const { data, error } = await supabase.from('steam_accounts').select('*');
+      
+      console.log("Dane z bazy:", data);
+      if (error) console.error("Błąd zapytania:", error);
+      
       setProducts(data || []);
       setLoading(false);
     };
@@ -23,7 +28,6 @@ export default function Home() {
   const login = async () => await supabase.auth.signInWithOAuth({ provider: 'discord' });
 
   const startPurchase = async (product, method) => {
-    // Dodane sprawdzenie zalogowania
     if (!user) return alert("Musisz się zalogować przez Discord, aby kupić!");
 
     const { data, error } = await supabase.from('orders').insert([{
@@ -31,10 +35,13 @@ export default function Home() {
       product_id: product.id,
       payment_method: method,
       status: 'pending',
-      amount: product.price
+      amount: product.price || 0
     }]).select().single();
 
-    if (error) return alert("Błąd startu płatności");
+    if (error) {
+      console.error(error);
+      return alert("Błąd startu płatności");
+    }
     
     if (method === 'crypto') {
       alert(`Wpłać ${product.price} LTC na adres: LM3eUhktfk69fRLXncjrRA4qEyULJmbbPc\nID zamówienia: ${data.id}`);
@@ -62,16 +69,16 @@ export default function Home() {
           </div>
         ) : (
           <div style={styles.grid}>
-            {products.map((p) => (
+            {products.length > 0 ? products.map((p) => (
               <div key={p.id} style={styles.card}>
                 <h3>{p.login}</h3>
-                <p>Cena: {p.price} LTC</p>
+                <p>Cena: {p.price || 0} LTC</p>
                 <div style={{display: 'flex', gap: '5px', marginTop: '10px'}}>
                   <button onClick={() => startPurchase(p, 'crypto')} style={styles.btn}>Kup (Krypto)</button>
                   <button onClick={() => startPurchase(p, 'psc')} style={styles.btn}>Kup (PSC)</button>
                 </div>
               </div>
-            ))}
+            )) : <p>Brak produktów w bazie.</p>}
           </div>
         )}
       </main>
